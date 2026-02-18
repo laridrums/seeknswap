@@ -1,4 +1,3 @@
-import { ConnectButton } from "@/components/ConnectButton";
 import { JupiterSwap } from "@/components/JupiterSwap";
 import { StatsBanner } from "@/components/StatsBanner";
 import { ArrowUpRight, Github } from "lucide-react";
@@ -36,7 +35,10 @@ export default function Home() {
           >
             Docs <ArrowUpRight size={12} />
           </a>
-          <ConnectButton />
+          <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-card border border-border">
+            <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
+            <span className="text-text text-sm font-body">Connect in the swap widget ↓</span>
+          </div>
         </div>
       </nav>
 
