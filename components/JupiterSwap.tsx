@@ -1,12 +1,13 @@
 "use client";
 
 import { FC, useEffect, useRef, useCallback } from "react";
+import { useWallet } from "@solana/wallet-adapter-react";
 
-// Your wallet — receives 0.5% of every swap automatically
 const PLATFORM_FEE_ACCOUNT = "An2aa1oFLiPTXbsqFrtmYgy2SFFBAL2Fu25GU9SAcvEU";
 const RPC = process.env.NEXT_PUBLIC_RPC_ENDPOINT || "https://api.mainnet-beta.solana.com";
 
 export const JupiterSwap: FC = () => {
+  const walletContextState = useWallet();
   const scriptLoaded = useRef(false);
 
   const initJupiter = useCallback(() => {
@@ -18,7 +19,10 @@ export const JupiterSwap: FC = () => {
       integratedTargetId: "jupiter-terminal-instance",
       endpoint: RPC,
 
-      // 50 basis points = 0.5% fee sent to your wallet
+      // Tell Jupiter to use OUR wallet adapter (the one connected in the nav)
+      enableWalletPassthrough: true,
+
+      // 50 basis points = 0.5%
       platformFeeAndAccounts: {
         feeBps: 50,
         feeAccounts: new Map([
@@ -27,7 +31,6 @@ export const JupiterSwap: FC = () => {
         ]),
       },
 
-      // Jupiter handles wallet connection internally — detects Phantom & Seeker automatically
       defaultInputMint: "So11111111111111111111111111111111111111112",
       defaultOutputMint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
       strictTokenList: false,
@@ -35,11 +38,9 @@ export const JupiterSwap: FC = () => {
     });
   }, []);
 
+  // Load script once
   useEffect(() => {
-    if (scriptLoaded.current) {
-      initJupiter();
-      return;
-    }
+    if (scriptLoaded.current) return;
 
     const script = document.createElement("script");
     script.src = "https://terminal.jup.ag/main-v3.js";
@@ -54,6 +55,16 @@ export const JupiterSwap: FC = () => {
       try { (window as any).Jupiter?.close?.(); } catch (_) {}
     };
   }, [initJupiter]);
+
+  // Sync wallet state into Jupiter every time wallet changes (connect/disconnect)
+  useEffect(() => {
+    if (!scriptLoaded.current) return;
+    const Jupiter = (window as any).Jupiter;
+    if (!Jupiter?.syncProps) return;
+
+    // This is the correct Jupiter v3 API to pass wallet state
+    Jupiter.syncProps({ passthroughWalletContextState: walletContextState });
+  }, [walletContextState.connected, walletContextState.publicKey, walletContextState]);
 
   return (
     <div className="w-full max-w-md mx-auto">
