@@ -1,25 +1,35 @@
 "use client";
 
-import { FC, useEffect, useRef } from "react";
+import { FC, useEffect, useRef, useCallback } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 
 // Your wallet — receives 0.5% of every swap automatically
 const PLATFORM_FEE_ACCOUNT = "An2aa1oFLiPTXbsqFrtmYgy2SFFBAL2Fu25GU9SAcvEU";
+const RPC = process.env.NEXT_PUBLIC_RPC_ENDPOINT || "https://api.mainnet-beta.solana.com";
 
 export const JupiterSwap: FC = () => {
   const { publicKey, signTransaction, signAllTransactions } = useWallet();
   const scriptLoaded = useRef(false);
+  const publicKeyRef = useRef(publicKey);
+  const signTransactionRef = useRef(signTransaction);
+  const signAllRef = useRef(signAllTransactions);
 
-  const initJupiter = () => {
+  // Keep refs in sync so initJupiter always has latest wallet state
+  publicKeyRef.current = publicKey;
+  signTransactionRef.current = signTransaction;
+  signAllRef.current = signAllTransactions;
+
+  const initJupiter = useCallback(() => {
     const Jupiter = (window as any).Jupiter;
     if (!Jupiter?.init) return;
+
+    // Close previous instance before re-initializing
+    try { Jupiter.close?.(); } catch (_) {}
 
     Jupiter.init({
       displayMode: "integrated",
       integratedTargetId: "jupiter-terminal-instance",
-      endpoint:
-        process.env.NEXT_PUBLIC_RPC_ENDPOINT ||
-        "https://api.mainnet-beta.solana.com",
+      endpoint: RPC,
 
       // 50 basis points = 0.5% fee sent to your wallet
       platformFeeAndAccounts: {
@@ -30,29 +40,35 @@ export const JupiterSwap: FC = () => {
         ]),
       },
 
-      // Pass connected wallet through to Jupiter
-      passThroughWallet: publicKey
-        ? { publicKey, signTransaction, signAllTransactions }
+      // Pass connected wallet — Jupiter uses this for signing transactions
+      passThroughWallet: publicKeyRef.current
+        ? {
+            publicKey: publicKeyRef.current,
+            signTransaction: signTransactionRef.current,
+            signAllTransactions: signAllRef.current,
+          }
         : null,
 
       // Default: SOL → USDC
       defaultInputMint: "So11111111111111111111111111111111111111112",
       defaultOutputMint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
 
-      // Allow all tokens including memecoins
       strictTokenList: false,
-
       containerStyles: { borderRadius: "16px" },
     });
-  };
+  }, []);
 
+  // Load script once on mount
   useEffect(() => {
-    if (scriptLoaded.current) {
+    if (scriptLoaded.current) return;
+
+    const existing = document.querySelector('script[src="https://terminal.jup.ag/main-v3.js"]');
+    if (existing) {
+      scriptLoaded.current = true;
       initJupiter();
       return;
     }
 
-    // Load Jupiter Terminal from CDN — no npm install needed
     const script = document.createElement("script");
     script.src = "https://terminal.jup.ag/main-v3.js";
     script.async = true;
@@ -65,8 +81,13 @@ export const JupiterSwap: FC = () => {
     return () => {
       try { (window as any).Jupiter?.close?.(); } catch (_) {}
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [publicKey]);
+  }, [initJupiter]);
+
+  // Re-init whenever wallet connects or disconnects
+  useEffect(() => {
+    if (!scriptLoaded.current) return;
+    initJupiter();
+  }, [publicKey, initJupiter]);
 
   return (
     <div className="w-full max-w-md mx-auto">

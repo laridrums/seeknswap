@@ -29,7 +29,7 @@ export default function Home() {
         {/* Nav links + connect */}
         <div className="flex items-center gap-4 fade-in-up fade-in-up-delay-1">
           <a
-            href="https://docs.jup.ag"
+            href="https://station.jup.ag/docs"
             target="_blank"
             rel="noopener noreferrer"
             className="hidden md:flex items-center gap-1 text-text-dim hover:text-text text-sm font-body transition-colors"
